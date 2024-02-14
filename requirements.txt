@@ -1,0 +1,6 @@
+Flask
+azure-cognitiveservices-speech
+azure-ai-textanalytics
+pydub
+soundfile
+gunicorn

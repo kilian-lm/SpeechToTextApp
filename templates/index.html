@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech To Text with NER</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f7f7f7; /* Light gray background */
+        }
+        #transcriptionContainer {
+            background-color: white; /* White background */
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            line-height: 2; /* Increased line height for better readability */
+            border: 1px solid #ccc; /* Added border */
+            min-height: 100px; /* Minimum height */
+        }
+        .entity-text {
+            background-color: #e7f4fd; /* Light blue background */
+            border-radius: 5px;
+            padding: 2px 5px;
+            margin: 0 5px;
+            font-size: 0.9rem;
+        }
+        .entity-badge {
+            background-color: #0056b3; /* Dark blue background */
+            color: white; /* White text color */
+            border-radius: 15px;
+            padding: 5px 10px;
+            margin: 0 5px;
+            font-size: 0.85rem;
+            white-space: nowrap; /* Prevents wrapping of content inside badges */
+        }
+        .transcription-flex-container {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 5px; /* Space between items */
+        }
+        .btn-lg {
+            padding: .5rem 1rem;
+            font-size: 1.25rem;
+            line-height: 1.5;
+            border-radius: .3rem;
+        }
+        .placeholder-text {
+            color: #adb5bd; /* Light font color for placeholder */
+        }
+    </style>
+</head>
+<body class="container">
+    <div id="fileList" class="mb-3"></div>
+
+    <div class="text-center mb-3">
+        <button id="startRecording" class="btn btn-primary btn-lg">Start Recording</button>
+        <button id="stopRecording" class="btn btn-secondary btn-lg" disabled>Stop Recording</button>
+    </div>
+
+    <div id="transcriptionContainer" class="transcription-flex-container placeholder-text">
+        Try saying: "It was a fun summer trip to Paris with John, who does excellent photography."
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        function updateFileList() {
+            fetch('/list_files')
+                .then(response => response.json())
+                .then(data => {
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = '<h3>Recorded Files</h3>';
+                    const listGroup = document.createElement('ul');
+                    listGroup.className = 'list-group';
+
+                    data.forEach(filename => {
+                        const listItem = document.createElement('li');
+                        listItem.className = 'list-group-item';
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = `/download/${filename}`;
+                        downloadLink.textContent = filename;
+                        listItem.appendChild(downloadLink);
+                        listGroup.appendChild(listItem);
+                    });
+
+                    fileList.appendChild(listGroup);
+                });
+        }
+
+        document.getElementById('startRecording').addEventListener('click', async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+
+                const formData = new FormData();
+                formData.append('audio', audioBlob);
+
+                fetch('/record', {
+                    method: 'POST',
+                    body: formData,
+                }).then(response => {
+                    if (response.ok) {
+                        console.log('Audio recorded and saved.');
+                        updateFileList();
+                        processTranscription();
+                    } else {
+                        console.error('Failed to save audio.');
+                    }
+                });
+
+                audioChunks = [];
+                document.getElementById('startRecording').disabled = false;
+                document.getElementById('stopRecording').disabled = true;
+            };
+
+            mediaRecorder.start();
+            document.getElementById('startRecording').disabled = true;
+            document.getElementById('stopRecording').disabled = false;
+        });
+
+        document.getElementById('stopRecording').addEventListener('click', () => {
+            mediaRecorder.stop();
+        });
+
+        function processTranscription() {
+            fetch('/transcription')
+                .then(response => response.json())
+                .then(data => {
+                    const transcriptionContainer = document.getElementById('transcriptionContainer');
+                    // If actual content is available, clear the placeholder
+                    if (data.combined_results.length > 0) {
+                        transcriptionContainer.innerHTML = '';
+                        transcriptionContainer.classList.remove('placeholder-text');
+                    }
+
+                    data.combined_results.forEach(item => {
+                        const textSpan = document.createElement('span');
+                        textSpan.textContent = item.text;
+                        textSpan.className = item.type === "text" ? '' : 'entity-text'; // Apply styling if it's an entity
+                        transcriptionContainer.appendChild(textSpan);
+
+                        if (item.type !== "text") {
+                            const badgeSpan = document.createElement('span');
+                            badgeSpan.classList.add('entity-badge');
+                            badgeSpan.textContent = item.type;
+                            transcriptionContainer.appendChild(badgeSpan);
+                        }
+                    });
+                });
+        }
+
+        updateFileList();
+    </script>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+</body>
+</html>
