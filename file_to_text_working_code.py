@@ -4,7 +4,7 @@ import threading
 
 # Function to get the latest audio file from the repository folder
 def get_latest_audio_file():
-    repository_path = 'repository'
+    repository_path = '/Users/d0342084/Documents/Git/SpeechToTextApp'
     audio_files = [os.path.join(repository_path, filename) for filename in os.listdir(repository_path) if filename.endswith('.wav')]
     if audio_files:
         return max(audio_files, key=os.path.getctime)

@@ -9,6 +9,9 @@ from azure.core.credentials import AzureKeyCredential
 import configparser
 import threading
 from pydub import AudioSegment
+from dotenv import load_dotenv
+load_dotenv('.env')
+
 
 # Load the configuration for Azure
 config = configparser.ConfigParser()
